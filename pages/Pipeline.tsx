@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Deal, DealStage } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Deal, DealStage, Contact } from '../types';
 import { storage } from '../services/storage';
 import { Modal } from '../components/Modal';
-import { Clock, Pencil, Trash2 } from 'lucide-react';
+import { Clock, Pencil, Trash2, Loader2 } from 'lucide-react';
 
 const COLUMNS = [
   { id: DealStage.LEAD, label: 'Novos Leads', color: 'bg-slate-100' },
@@ -20,13 +20,26 @@ const COMPANY_OPTIONS = [
 ];
 
 export const Pipeline: React.FC = () => {
-  // Inicializa estado com dados do storage
-  const [deals, setDeals] = useState<Deal[]>(() => storage.getDeals());
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDealId, setEditingDealId] = useState<string | null>(null);
   
-  // Carrega contatos para referência visual nos cards antigos
-  const contacts = storage.getContacts();
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const [dealsData, contactsData] = await Promise.all([
+        storage.getDeals(),
+        storage.getContacts()
+      ]);
+      setDeals(dealsData);
+      setContacts(contactsData);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   // Form State
   const [formData, setFormData] = useState<Partial<Deal>>({
@@ -42,12 +55,14 @@ export const Pipeline: React.FC = () => {
     e.dataTransfer.setData('dealId', id);
   };
 
-  const handleDrop = (e: React.DragEvent, stage: DealStage) => {
+  const handleDrop = async (e: React.DragEvent, stage: DealStage) => {
     const id = e.dataTransfer.getData('dealId');
+    // Atualiza UI otimisticamente
     const updatedDeals = deals.map(d => d.id === id ? { ...d, stage } : d);
-    
     setDeals(updatedDeals);
-    storage.saveDeals(updatedDeals);
+    
+    // Salva no background
+    await storage.saveDeals(updatedDeals);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -73,22 +88,22 @@ export const Pipeline: React.FC = () => {
       title: deal.title,
       value: deal.value,
       stage: deal.stage,
-      companyName: deal.companyName || 'Base Show', // Fallback se antigo
+      companyName: deal.companyName || 'Base Show',
       probability: deal.probability,
       tags: deal.tags
     });
     setIsModalOpen(true);
   };
 
-  const handleDeleteDeal = (id: string) => {
+  const handleDeleteDeal = async (id: string) => {
     if (window.confirm("Tem certeza que deseja excluir este negócio?")) {
       const updatedDeals = deals.filter(d => d.id !== id);
       setDeals(updatedDeals);
-      storage.saveDeals(updatedDeals);
+      await storage.saveDeals(updatedDeals);
     }
   };
 
-  const handleSaveDeal = (e: React.FormEvent) => {
+  const handleSaveDeal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.value) return;
 
@@ -102,7 +117,6 @@ export const Pipeline: React.FC = () => {
         value: Number(formData.value),
         stage: formData.stage as DealStage,
         companyName: formData.companyName,
-        // Mantém outros campos originais se necessário ou atualiza se houver campo no form
       } : d);
     } else {
       // Criando novo
@@ -120,9 +134,17 @@ export const Pipeline: React.FC = () => {
     }
 
     setDeals(updatedDeals);
-    storage.saveDeals(updatedDeals);
     setIsModalOpen(false);
+    await storage.saveDeals(updatedDeals);
   };
+
+  if (loading) {
+    return (
+      <div className="h-[calc(100vh-8rem)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col animate-fade-in">
@@ -169,7 +191,6 @@ export const Pipeline: React.FC = () => {
                           {deal.tags[0]}
                         </span>
                         
-                        {/* Ações de Edição/Exclusão - Visíveis no hover */}
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute top-3 right-3 bg-white pl-2">
                           <button 
                             onClick={() => openEditDealModal(deal)}

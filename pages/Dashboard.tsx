@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -10,8 +10,9 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { DollarSign, TrendingUp, Users, Activity } from 'lucide-react';
+import { DollarSign, TrendingUp, Users, Activity, Loader2 } from 'lucide-react';
 import { storage } from '../services/storage';
+import { Deal } from '../types';
 
 const StatCard = ({ icon: Icon, title, value, change, positive }: any) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -29,15 +30,24 @@ const StatCard = ({ icon: Icon, title, value, change, positive }: any) => (
 );
 
 export const Dashboard: React.FC = () => {
-  // Carrega dados reais do storage
-  const deals = storage.getDeals();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const loadedDeals = await storage.getDeals();
+      setDeals(loadedDeals);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
   
   const stats = useMemo(() => {
     const totalValue = deals.reduce((acc, deal) => acc + deal.value, 0);
     const activeDeals = deals.length;
     const avgTicket = activeDeals > 0 ? totalValue / activeDeals : 0;
     
-    // Simulação de dados de gráfico baseada no volume atual (apenas visual)
+    // Simulação de dados de gráfico baseada no volume atual
     const graphData = [
       { name: 'Jan', revenue: totalValue * 0.4 },
       { name: 'Fev', revenue: totalValue * 0.6 },
@@ -51,11 +61,23 @@ export const Dashboard: React.FC = () => {
     return { totalValue, activeDeals, avgTicket, graphData };
   }, [deals]);
 
+  if (loading) {
+    return (
+      <div className="h-96 flex flex-col items-center justify-center text-gray-400">
+        <Loader2 className="w-8 h-8 animate-spin mb-2" />
+        <p>Carregando Dashboard...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="text-sm text-gray-500">Dados salvos localmente</div>
+        <div className="text-sm text-gray-500 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          Sistema Online
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

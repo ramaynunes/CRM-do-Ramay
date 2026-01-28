@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { storage } from '../services/storage';
 import { Contact } from '../types';
 import { Modal } from '../components/Modal';
-import { Phone, MoreHorizontal } from 'lucide-react';
+import { Phone, MoreHorizontal, Loader2 } from 'lucide-react';
 
 export const Contacts: React.FC = () => {
-  // Inicializa com dados do storage
-  const [contacts, setContacts] = useState<Contact[]>(() => storage.getContacts());
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
+  useEffect(() => {
+    const loadContacts = async () => {
+      setLoading(true);
+      const data = await storage.getContacts();
+      setContacts(data);
+      setLoading(false);
+    };
+    loadContacts();
+  }, []);
+
   // Form State
   const [newContact, setNewContact] = useState<Partial<Contact>>({
     name: '',
@@ -25,7 +35,7 @@ export const Contacts: React.FC = () => {
     c.company.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddContact = (e: React.FormEvent) => {
+  const handleAddContact = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContact.name || !newContact.email) return;
 
@@ -43,8 +53,6 @@ export const Contacts: React.FC = () => {
 
     const updatedContacts = [...contacts, contact];
     setContacts(updatedContacts);
-    storage.saveContacts(updatedContacts);
-    
     setIsAddModalOpen(false);
     setNewContact({
       name: '',
@@ -54,7 +62,18 @@ export const Contacts: React.FC = () => {
       role: '',
       notes: ''
     });
+    
+    await storage.saveContacts(updatedContacts);
   };
+
+  if (loading) {
+    return (
+      <div className="h-96 flex flex-col items-center justify-center text-gray-400">
+        <Loader2 className="w-8 h-8 animate-spin mb-2" />
+        <p>Carregando contatos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
